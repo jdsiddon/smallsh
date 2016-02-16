@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
 
 #define MAX_ARGS 512
 #define MAX_CHARS 2048
@@ -116,23 +117,7 @@ Algorithm
 - places word after '>' into output file variable
 - returns command struct
 
-checkInput()
-Checks that input file has 'read' only flag set.
-Algorithm
-- accepts command struct
-- opens input file
-- checks if read only flag is on file
-- if success, return 1
-- else, return error
 
-checkOutput()
-Checks that output file has 'write' only flag set.
-Algorithm
-- accepts command struct
-- opens input file
-- checks if write only flag is on file
-- if success, return 1
-- else, return error
 
 commandBuiltIn()
 Checks to see if the passed command is a built in command or not (exit, cd, or status)
@@ -301,6 +286,77 @@ struct Command* getCommand() {
 };
 
 
+//
+// checkInput()
+// Checks that input file has 'read' only flag set.
+// Algorithm
+// - accepts command struct
+// - opens input file
+// - checks if read only flag is on file
+// - if success, return 1
+// - else, return error
+//
+int checkInput(struct Command *cmd) {
+  int inputValid = 1;
+
+  if((int)strlen(cmd->inFilename) > 0) {      // Only check validity of input if one was provided.
+    FILE *input;
+    input = fopen(cmd->inFilename, "r");      // Open input file for reading.
+    if(input == NULL) {                       // Error opening file!
+      switch(errno) {
+        case 2:
+          printf("%s: no such file or directory", cmd->inFilename);
+          break;
+        case 13:
+          printf("%s: cannot open file for input", cmd->inFilename);
+          break;
+      }
+      inputValid = 0;
+
+    } else {                                  // File open was successful.
+      fclose(input);                          // Close file.
+
+    }
+  }
+
+  return inputValid;                          // Will return invalid if the file returned errors when trying to open file.
+}
+
+
+// checkOutput()
+// Checks that output file has 'write' only flag set.
+// Algorithm
+// - accepts command struct
+// - opens input file
+// - checks if write only flag is on file
+// - if success, return 1
+// - else, return error
+int checkOutput(struct Command *cmd) {
+  int outputValid = 1;
+
+  if((int)strlen(cmd->outFilename) > 0) {      // Only check validity of output if one was provided.
+    FILE *output;
+    output = fopen(cmd->outFilename, "w");      // Open output file for reading.
+    if(output == NULL) {                       // Error opening file!
+      switch(errno) {
+        case 2:
+          printf("%s: no such file or directory", cmd->outFilename);
+          break;
+        case 13:
+          printf("%s: cannot open file for output", cmd->outFilename);
+          break;
+      }
+      outputValid = 0;
+
+    } else {                                  // File open was successful.
+      fclose(output);                          // Close file.
+
+    }
+  }
+
+  return outputValid;                          // Will return invalid if the file returned errors when trying to open file.
+}
+
 
 
 int main() {
@@ -321,6 +377,13 @@ int main() {
     // printf("Output: %s\n", userCmd->outFilename);
     // printf("Bg: %d\n", userCmd->backgroundProcess);
 
+    if(checkInput(userCmd) == 0) {
+      continue;                         // Input file was bad, reprompt.
+    }
+
+    if(checkOutput(userCmd) == 0) {
+      continue;                         // Output file was bad, reprompt.
+    }
 
     quitProg = 1;
   } while(quitProg != 1);

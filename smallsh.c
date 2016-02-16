@@ -1,3 +1,33 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_ARGS 512
+#define MAX_CHARS 2048
+
+struct Command {
+  char cmd[MAX_ARGS];
+  char args[MAX_ARGS][MAX_CHARS];               // Give me plenty of headroom for arguements.
+  int argLen;
+  char inFilename[MAX_ARGS];
+  char outFilename[MAX_ARGS];
+  int backgroundProcess;
+};
+
+/**************************************************
+** Function: allocate
+** Description: This function gets called to allocate enough space to hold the number rooms
+**    that will be used to play.
+** Parameters: none
+** Returns: Pointer to a struct
+**************************************************/
+struct Command* allocate() {
+  struct Command *command = (struct Command*) malloc (sizeof(struct Command));
+  return command;
+};
+
+
 /**
 : will be used to prompt for each command line (make sure you flush with fflush())
 Syntax: command [arg1 arg2 ...] [< input_file] [> output_file] [&]
@@ -58,9 +88,7 @@ status - prints out the exit status or terminating signal of the last foreground
 /**
 FUNCTIONS
 
-promptUser()
-- print ":" to get command line arguments
-- fflush() to clear output buffer
+
 
 readCmd()
 Breaks each command into a command struct. Command struct will be used through program to denote what the user wants to do.
@@ -152,7 +180,7 @@ MAIN PROGRAM Algorithm
 
 start program
 promptUser(); - Just outputs ":"
-readCmd();
+getCmd();
 checkInput();
 checkOutup();
 
@@ -168,6 +196,96 @@ else
 - createForeProcess();
 */
 
+/**
+ * promptUser()
+ * - print ":" to get command line arguments
+ * - fflush() to clear output buffer
+ */
+ void promptUser(){
+   printf("\n: ");
+   fflush(stdout);
+ };
+
+ /**************************************************
+ ** Function: getCommand
+ ** Description: This function gets the users input, stores it into a command structure
+ **  for use throughout the program.
+ ** Parameters: none
+ ** Returns: none
+ **************************************************/
+struct Command* getCommand() {
+  char buffer[MAX_CHARS];               // Buffer to hold user input.
+  char *arg;
+  int cmdSize;
+  int validInput = 1;
+  struct Command *cmd = allocate();     // Create command structure, get memory.
+  int i = 0;
+
+  // Keep prompting user for input until they provide a valid command.
+  do {
+    promptUser();
+    fgets(buffer, MAX_CHARS, stdin);                               // Read in command.
+    buffer[strcspn(buffer, "\n")] = 0;                             // Pull out newline character from user entered string.
+    cmdSize = (int)strlen(buffer);
+
+    // printf("Command Size: %d", cmdSize);
+
+    if(cmdSize > MAX_CHARS) {           // Check command length.
+      validInput = 0;
+
+    } else if(cmdSize == 0) {           // User pressed enter.
+      validInput = 0;
+
+    } else {
+      arg = strtok(buffer, " ");        // Get command, (1st argument user enters.)
+      strcpy(cmd->cmd, arg);
+
+      arg = strtok(NULL, " ");          // Get first arguement.
+
+      // Loop through each argument.
+      while(arg != NULL) {
+        // printf("Arg: %s\n", arg);
+        strcpy(cmd->args[cmd->argLen], arg);      // Put arguement string in the command structure.
+        cmd->argLen = cmd->argLen + 1;            // Increment number of arguments.
+
+        if(cmd->argLen >= MAX_ARGS) {             // Check and make sure user didn't pass to many arguements.
+          validInput = 0;                         // Input isn't valid.
+          memset(cmd->args, 0x00, MAX_ARGS);      // Reset array to 0.
+        }
+        arg = strtok(NULL, " ");
+      }
+
+      // Debuggin # of commands and args.
+      printf("Command: %s\n", cmd->cmd);
+      for(i = 0; i < cmd->argLen; i++) {
+        printf("Arg %d: %s\n", i, cmd->args[i]);
+      }
+
+      validInput = 1;
+
+    }
+
+  } while(validInput == 0);
+
+  return cmd;
+
+};
+
+
+
+
 int main() {
-  
-}
+  int quitProg = 0;
+  struct Command *userCmd;
+
+
+  do{
+    userCmd = getCommand();             // Get the user's entered command.
+
+    
+
+
+    quitProg = 1;
+  } while(quitProg != 1);
+
+};

@@ -217,6 +217,7 @@ struct Command* getCommand() {
   char buffer[MAX_CHARS];               // Buffer to hold user input.
   char *arg;
   int cmdSize;
+  int ioAssigned;                       // Flag to determine if i/o args have been passed, no other (non-i/o) args except '&' can follow.
   int validInput = 1;
   struct Command *cmd = allocate();     // Create command structure, get memory.
   int i = 0;
@@ -239,36 +240,64 @@ struct Command* getCommand() {
     } else {
       arg = strtok(buffer, " ");        // Get command, (1st argument user enters.)
       strcpy(cmd->cmd, arg);
+      ioAssigned = 0;                   // Initialize i/o to 0;
 
       arg = strtok(NULL, " ");          // Get first arguement.
 
       // Loop through each argument.
       while(arg != NULL) {
         // printf("Arg: %s\n", arg);
-        strcpy(cmd->args[cmd->argLen], arg);      // Put arguement string in the command structure.
-        cmd->argLen = cmd->argLen + 1;            // Increment number of arguments.
 
-        if(cmd->argLen >= MAX_ARGS) {             // Check and make sure user didn't pass to many arguements.
-          validInput = 0;                         // Input isn't valid.
-          memset(cmd->args, 0x00, MAX_ARGS);      // Reset array to 0.
+        // Check if arguements is actually input/output.
+        if(strcmp(arg, ">") == 0) {     // Argument is actually output file '> output'.
+          arg = strtok(NULL, " ");      // Get following string.
+          // printf("Output: %s\n", arg);
+          strcpy(cmd->outFilename, arg);
+          ioAssigned = 1;               // i/o assigned!
+          continue;
+
+        } else if(strcmp(arg, "<") == 0) {
+          arg = strtok(NULL, " ");      // Get following string.
+          // printf("Input: %s\n", arg);           // Arguement is actually input file '< input'.
+          strcpy(cmd->inFilename, arg);
+          ioAssigned = 1;               // i/o assigned!
+          continue;
+
+        } else if((ioAssigned == 0) && (strcmp(arg, "&") != 0)) { // Only get arguments if i/o isn't assigned, and != &.
+          strcpy(cmd->args[cmd->argLen], arg);      // Put arguement string in the command structure.
+          cmd->argLen = cmd->argLen + 1;            // Increment number of arguments.
+
+          if(cmd->argLen >= MAX_ARGS) {             // Check and make sure user didn't pass to many arguements.
+            validInput = 0;                         // Input isn't valid.
+            memset(cmd->args, 0x00, MAX_ARGS);      // Reset array to 0.
+          }
+
+        } else {                            // At the end of the arg string.
+          if(strcmp(arg, "&") == 0) {
+            cmd->backgroundProcess = 1;
+          } else {
+            cmd->backgroundProcess = 0;
+          }
         }
         arg = strtok(NULL, " ");
+
       }
 
-      // Debuggin # of commands and args.
-      printf("Command: %s\n", cmd->cmd);
-      for(i = 0; i < cmd->argLen; i++) {
-        printf("Arg %d: %s\n", i, cmd->args[i]);
-      }
+      // Debuggin command struct and args.
+      // printf("Command: %s\n", cmd->cmd);
+      // for(i = 0; i < cmd->argLen; i++) {
+      //   printf("Arg %d: %s\n", i, cmd->args[i]);
+      // }
+      // printf("Input: %s\n", cmd->inFilename);
+      // printf("Output: %s\n", cmd->outFilename);
+      // printf("Bg: %d\n", cmd->backgroundProcess);
 
       validInput = 1;
-
     }
 
   } while(validInput == 0);
 
   return cmd;
-
 };
 
 
@@ -277,12 +306,20 @@ struct Command* getCommand() {
 int main() {
   int quitProg = 0;
   struct Command *userCmd;
+  int i = 0;
 
 
   do{
     userCmd = getCommand();             // Get the user's entered command.
 
-    
+    // Debuggin command struct and args.
+    // printf("Command: %s\n", userCmd->cmd);
+    // for(i = 0; i < userCmd->argLen; i++) {
+    //   printf("Arg %d: %s\n", i, userCmd->args[i]);
+    // }
+    // printf("Input: %s\n", userCmd->inFilename);
+    // printf("Output: %s\n", userCmd->outFilename);
+    // printf("Bg: %d\n", userCmd->backgroundProcess);
 
 
     quitProg = 1;

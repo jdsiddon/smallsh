@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <errno.h>
+#include <unistd.h>
 
 #define MAX_ARGS 512
 #define MAX_CHARS 2048
@@ -136,25 +137,6 @@ Algorithm
 Your shell does not need to support any quoting; so arguments with spaces inside them are not possible.
 
 
-createForeProcess()
-Creates a foreground process and executes it.
-Algorithm
-- Fork process
-- Call waitpid on the child process, requiring the parent to wait until child returns.
-- commandBuiltIn();
-- Execute process
-- Process completes return to get command line statement
-
-createBackProcess()
-Creates a background process and executes it.
-Algorithm
-- Fork Process
-- setup input redirection, use dup2
-- setup output redirection, use dup2
-- commandBuiltIn();
-- execute process
-- Print background process pid "background pid is XXXX"
-- Return command line control immediately
 
 
 */
@@ -358,6 +340,114 @@ int checkOutput(struct Command *cmd) {
 }
 
 
+// createForeProcess()
+// Creates a foreground process and executes it.
+// Algorithm
+// - Fork process
+// - Call waitpid on the child process, requiring the parent to wait until child returns.
+// - commandBuiltIn();
+// - Execute process
+// - Process completes return to get command line statement
+void createForeProcess(struct Command *cmd) {
+  pid_t parent = getpid();
+  pid_t pid = fork();
+  int i;
+
+  const char* command = cmd->cmd;                 // Get the user's entered command.
+
+  char* argv[cmd->argLen];
+  //
+  // // This creates an array of pointers to my arguements, it also flattens the 2 dimensional array.
+  for(i = 0; i < cmd->argLen; i++) {
+    argv[i] = &cmd->args[i][0];          // Just copy the arguements address into the argv array.
+  }
+
+  for(i = 0; i < cmd->argLen; i++) {
+    printf("Val %d: %s\n", i, argv[i]);
+  }
+
+  // argv[cmd->argLen+1] = NULL;
+
+  if(pid == -1) {
+    // error
+  } else if(pid > 0) {
+    int status;
+    waitpid(pid, &status, 0);
+    printf("done");
+  } else {
+    // execvp(command, &argv[0]);
+    _exit(0);
+  }
+
+
+
+  // pid_t pid;
+  // pid_t waitpid;
+  // int status;
+  // char *const testArgs[] = {" ", NULL};
+  //
+  // printf("Parent PID = %d\n", getpid());
+  //
+  // pid = fork();             // Create new process.
+  //
+  // if(pid == 0) {            // We are in the child process.
+  //   printf("hi from child!\n");
+  //   fflush(stdout);
+  //   execvp("sleep(5)", &testArgs[0]);               // Check PATH for command.
+  //   exit(0);
+  //
+  // } else if(pid > 0) {      // We are in the parent process.
+  //   int childReturn;
+  //
+  //   printf("hi from parent!\n");
+  //   fflush(stdout);
+  //
+  //   if( (waitpid = wait(&status) < 0) ) {
+  //     perror("wait");
+  //     _exit(1);
+  //   }
+  //
+  //   printf("parent: child exited [%d]", childReturn);
+  //   fflush(stdout);
+  //
+  // } else {
+  //   printf("Error %d: foreground process aborted\n", errno);
+  // }
+
+
+}
+
+
+// createBackProcess()
+// Creates a background process and executes it.
+// Algorithm
+// - Fork Process
+// - setup input redirection, use dup2
+// - setup output redirection, use dup2
+// - commandBuiltIn();
+// - execute process
+// - Print background process pid "background pid is XXXX"
+// - Return command line control immediately
+void createBackProcess(struct Command *cmd) {
+
+}
+
+
+int executeCommand(struct Command *cmd) {
+
+  if(strcmp("exit", cmd->cmd) == 0 || strcmp("exit", cmd->cmd) == 0 || strcmp("exit", cmd->cmd) == 0) {
+    printf("Built in command!\n");
+
+  } else if(cmd->backgroundProcess) {            // Check the process type to create.
+    createBackProcess(cmd);
+
+  } else {
+    createForeProcess(cmd);
+
+  }
+
+}
+
 
 int main() {
   int quitProg = 0;
@@ -385,6 +475,9 @@ int main() {
       continue;                         // Output file was bad, reprompt.
     }
 
+    executeCommand(userCmd);
+
+    // sleep(10);
     quitProg = 1;
   } while(quitProg != 1);
 

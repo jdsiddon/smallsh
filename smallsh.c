@@ -241,18 +241,18 @@ struct Command* getCommand() {
       }
 
       //Debuggin command struct and args.
-      printf("Command: %s\n", cmd->cmd);
-      fflush(stdout);
-      for(i = 0; i < cmd->argLen; i++) {
-        printf("Arg %d: %s\n", i, cmd->args[i]);
-        fflush(stdout);
-      }
-      printf("Input: %s\n", cmd->inFilename);
-      fflush(stdout);
-      printf("Output: %s\n", cmd->outFilename);
-      fflush(stdout);
-      printf("Bg: %d\n", cmd->backgroundProcess);
-      fflush(stdout);
+      // printf("Command: %s\n", cmd->cmd);
+      // fflush(stdout);
+      // for(i = 0; i < cmd->argLen; i++) {
+      //   printf("Arg %d: %s\n", i, cmd->args[i]);
+      //   fflush(stdout);
+      // }
+      // printf("Input: %s\n", cmd->inFilename);
+      // fflush(stdout);
+      // printf("Output: %s\n", cmd->outFilename);
+      // fflush(stdout);
+      // printf("Bg: %d\n", cmd->backgroundProcess);
+      // fflush(stdout);
 
       validInput = 1;
     }
@@ -348,66 +348,35 @@ int checkOutput(struct Command *cmd) {
 // - Execute process
 // - Process completes return to get command line statement
 int createForeProcess(struct Command *cmd) {
-  pid_t parent = getpid();
-
+  pid_t parent = getpid();        // Get parent pid.
   int i;
 
-  pid_t pid = fork();
-  const char* command = cmd->cmd;                 // Get the user's entered command.
-
-  printf("Length: %d\n", cmd->argLen);
-  fflush(stdout);
-
-  int newArgLen = cmd->argLen+2;              // Add two to arg array, 1 to hold command, 1 to hold 'NULL'.
-
-  char* argv[newArgLen];                      // Adding 1 so the arg array can have the command as the first element.
-
-  // This creates an array of pointers to my arguements, it also flattens the 2 dimensional array.
-  // for(i = 0; i < cmd->argLen; i++) {
-  //   if(i == 0) {
-  //     argv[i] = cmd->cmd;
-  //   } else {
-  //     argv[i] = cmd->args[i][0];          // Just copy the arguements address into the argv array.
-  //   }
-  // }
-
-  // for(i = 0; i < newArgLen; i++) {
-  //   printf("Arg: %s\n", argv[i]);
-  //   fflush(stdout);
-  // }
-
-  argv[0] = cmd->cmd;
-  int j = 1;
-  for(i = 0; i < cmd->argLen; i++) {
-    argv[j] = cmd->args[i];
-    j++;
-  }
-  argv[newArgLen-1] = NULL;
-
-  printf("New Leng: %d\n", newArgLen);
-  fflush(stdout);
-
-  for(i = 0; i < newArgLen; i++) {
-    printf("Arg %d: %s\n", i, argv[i]);
-    fflush(stdout);
-  }
-
+  pid_t pid = fork();             // Fork process
 
   if(pid == -1) {
     exit(1);            // error
 
-  } else if(pid > 0) {
+  } else if(pid > 0) {              // PARENT PROCESS
     int status;
-    waitpid(pid, &status, 0);
+    waitpid(pid, &status, 0);       // Waits for child process.
     return status;
 
-  } else {
-    //char *test[] = {"echo", "Hello", "World", NULL};
-    char *test[] = {"pwd", NULL};
-    execvp(test[0], test);
-    // execvp(command, argv);
-    //fflush(stdout);
+  } else {                          // CHILD PROCESS
+    int newArgLen = cmd->argLen+2;              // Add two to arg array, 1 to hold command, 1 to hold 'NULL'.
+    char* argv[newArgLen];                      // Adding 1 so the arg array can have the command as the first element.
+
+    // Create an array to pass to the exec command.
+    argv[0] = cmd->cmd;
+    int j = 1;
+    for(i = 0; i < cmd->argLen; i++) {
+      argv[j] = cmd->args[i];
+      j++;
+    }
+    argv[newArgLen-1] = NULL;               // Set last element to NULL as required by exec function family.
+
+    execvp(argv[0], argv);                  // Execute the passed command.
     _exit(0);
+
   }
 }
 
@@ -431,12 +400,10 @@ void exitCommand() {
   kill(0, SIGKILL);
 }
 
-// Built in command, changes directory.
-
 
 // Built in command, prints the exit status or terminating signal of the last foreground process.
 void statusCommand(int status) {
-  printf("exit value: %d", status);                      // Print out the previous commands status value.
+  printf("exit value %d\n", status);                      // Print out the previous commands status value.
   fflush(stdout);
 }
 

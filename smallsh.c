@@ -121,18 +121,6 @@ Algorithm
 
 
 
-commandBuiltIn()
-Checks to see if the passed command is a built in command or not (exit, cd, or status)
-if it isn't it returns 0, if it is it returns 1.
-Algorithm
-- Get command from command struct
-- check command
-- if command exit, return 1
-- if command cd, return 1
-- if command status, return 1
-- else return 0
-
-
 
 
 Your shell does not need to support any quoting; so arguments with spaces inside them are not possible.
@@ -170,11 +158,11 @@ else
  * - fflush() to clear output buffer
  */
  void promptUser(){
-   printf("\n: ");
+   printf(": ");
    fflush(stdout);
  };
 
- /**************************************************
+ /****************************** ********************
  ** Function: getCommand
  ** Description: This function gets the users input, stores it into a command structure
  **  for use throughout the program.
@@ -194,6 +182,7 @@ struct Command* getCommand() {
   do {
     promptUser();
     fgets(buffer, MAX_CHARS, stdin);                               // Read in command.
+
     buffer[strcspn(buffer, "\n")] = 0;                             // Pull out newline character from user entered string.
     cmdSize = (int)strlen(buffer);
 
@@ -251,14 +240,19 @@ struct Command* getCommand() {
 
       }
 
-      // Debuggin command struct and args.
-      // printf("Command: %s\n", cmd->cmd);
-      // for(i = 0; i < cmd->argLen; i++) {
-      //   printf("Arg %d: %s\n", i, cmd->args[i]);
-      // }
-      // printf("Input: %s\n", cmd->inFilename);
-      // printf("Output: %s\n", cmd->outFilename);
-      // printf("Bg: %d\n", cmd->backgroundProcess);
+      //Debuggin command struct and args.
+      printf("Command: %s\n", cmd->cmd);
+      fflush(stdout);
+      for(i = 0; i < cmd->argLen; i++) {
+        printf("Arg %d: %s\n", i, cmd->args[i]);
+        fflush(stdout);
+      }
+      printf("Input: %s\n", cmd->inFilename);
+      fflush(stdout);
+      printf("Output: %s\n", cmd->outFilename);
+      fflush(stdout);
+      printf("Bg: %d\n", cmd->backgroundProcess);
+      fflush(stdout);
 
       validInput = 1;
     }
@@ -289,9 +283,11 @@ int checkInput(struct Command *cmd) {
       switch(errno) {
         case 2:
           printf("%s: no such file or directory", cmd->inFilename);
+          fflush(stdout);
           break;
         case 13:
           printf("%s: cannot open file for input", cmd->inFilename);
+          fflush(stdout);
           break;
       }
       inputValid = 0;
@@ -324,9 +320,11 @@ int checkOutput(struct Command *cmd) {
       switch(errno) {
         case 2:
           printf("%s: no such file or directory", cmd->outFilename);
+          fflush(stdout);
           break;
         case 13:
           printf("%s: cannot open file for output", cmd->outFilename);
+          fflush(stdout);
           break;
       }
       outputValid = 0;
@@ -351,73 +349,66 @@ int checkOutput(struct Command *cmd) {
 // - Process completes return to get command line statement
 int createForeProcess(struct Command *cmd) {
   pid_t parent = getpid();
-  pid_t pid = fork();
+
   int i;
 
+  pid_t pid = fork();
   const char* command = cmd->cmd;                 // Get the user's entered command.
 
-  char* argv[cmd->argLen];
-  //
-  // // This creates an array of pointers to my arguements, it also flattens the 2 dimensional array.
+  printf("Length: %d\n", cmd->argLen);
+  fflush(stdout);
+
+  int newArgLen = cmd->argLen+2;              // Add two to arg array, 1 to hold command, 1 to hold 'NULL'.
+
+  char* argv[newArgLen];                      // Adding 1 so the arg array can have the command as the first element.
+
+  // This creates an array of pointers to my arguements, it also flattens the 2 dimensional array.
+  // for(i = 0; i < cmd->argLen; i++) {
+  //   if(i == 0) {
+  //     argv[i] = cmd->cmd;
+  //   } else {
+  //     argv[i] = cmd->args[i][0];          // Just copy the arguements address into the argv array.
+  //   }
+  // }
+
+  // for(i = 0; i < newArgLen; i++) {
+  //   printf("Arg: %s\n", argv[i]);
+  //   fflush(stdout);
+  // }
+
+  argv[0] = cmd->cmd;
+  int j = 1;
   for(i = 0; i < cmd->argLen; i++) {
-    argv[i] = &cmd->args[i][0];          // Just copy the arguements address into the argv array.
+    argv[j] = cmd->args[i];
+    j++;
+  }
+  argv[newArgLen-1] = NULL;
+
+  printf("New Leng: %d\n", newArgLen);
+  fflush(stdout);
+
+  for(i = 0; i < newArgLen; i++) {
+    printf("Arg %d: %s\n", i, argv[i]);
+    fflush(stdout);
   }
 
-  for(i = 0; i < cmd->argLen; i++) {
-    printf("Val %d: %s\n", i, argv[i]);
-  }
-
-  // argv[cmd->argLen+1] = NULL;
 
   if(pid == -1) {
-    // error
-    exit(1);
+    exit(1);            // error
+
   } else if(pid > 0) {
     int status;
     waitpid(pid, &status, 0);
-    printf("done, status: %d", status);
     return status;
+
   } else {
-    // execvp(command, &argv[0]);
+    //char *test[] = {"echo", "Hello", "World", NULL};
+    char *test[] = {"pwd", NULL};
+    execvp(test[0], test);
+    // execvp(command, argv);
+    //fflush(stdout);
     _exit(0);
   }
-
-
-
-  // pid_t pid;
-  // pid_t waitpid;
-  // int status;
-  // char *const testArgs[] = {" ", NULL};
-  //
-  // printf("Parent PID = %d\n", getpid());
-  //
-  // pid = fork();             // Create new process.
-  //
-  // if(pid == 0) {            // We are in the child process.
-  //   printf("hi from child!\n");
-  //   fflush(stdout);
-  //   execvp("sleep(5)", &testArgs[0]);               // Check PATH for command.
-  //   exit(0);
-  //
-  // } else if(pid > 0) {      // We are in the parent process.
-  //   int childReturn;
-  //
-  //   printf("hi from parent!\n");
-  //   fflush(stdout);
-  //
-  //   if( (waitpid = wait(&status) < 0) ) {
-  //     perror("wait");
-  //     _exit(1);
-  //   }
-  //
-  //   printf("parent: child exited [%d]", childReturn);
-  //   fflush(stdout);
-  //
-  // } else {
-  //   printf("Error %d: foreground process aborted\n", errno);
-  // }
-
-
 }
 
 
@@ -446,6 +437,23 @@ void exitCommand() {
 // Built in command, prints the exit status or terminating signal of the last foreground process.
 void statusCommand(int status) {
   printf("exit value: %d", status);                      // Print out the previous commands status value.
+  fflush(stdout);
+}
+
+// The cd command changes directories.  By itself, it changes to the directory specified
+// in the HOME environment variable (not to the location where smallsh was executed
+// from, unless your shell is located in the HOME directory).  It can also take one
+// argument, the path of the directory to change to. Note that this is a working
+// directory: when smallsh exits, the pwd will be the original pwd when smallsh was
+// launched. Your cd command should support both absolute and relative paths.
+void cdCommand(char *path) {
+  printf("Path: %s", path);
+  fflush(stdout);
+
+  if((int)strlen(path) > 0) {       // If user specified a path.
+    chdir(path);
+  }
+
 }
 
 
@@ -456,7 +464,7 @@ int executeCommand(struct Command *cmd, int prevCmdStatus) {
     exitCommand();
 
   } else if(strcmp("cd", cmd->cmd) == 0) {            // Built in command cd.
-    //cdCommand();
+    cdCommand(cmd->args[0]);                          // First arguement will be path.
 
   } else if(strcmp("status", cmd->cmd) == 0) {        // Built in command status.
     statusCommand(prevCmdStatus);                     // Pass status pointer to status command method.
@@ -466,7 +474,8 @@ int executeCommand(struct Command *cmd, int prevCmdStatus) {
 
   } else {                                            // Foreground process.
     foreStatus = createForeProcess(cmd);              // -1 means error
-    printf("Foreground: %d\b", foreStatus);
+    //printf("Foreground: %d\b", foreStatus);
+    //fflush(stdout);
 
   }
   return 1;

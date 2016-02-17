@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <errno.h>
+#include <signal.h>
 #include <unistd.h>
 
 #define MAX_ARGS 512
@@ -348,7 +349,7 @@ int checkOutput(struct Command *cmd) {
 // - commandBuiltIn();
 // - Execute process
 // - Process completes return to get command line statement
-void createForeProcess(struct Command *cmd) {
+int createForeProcess(struct Command *cmd) {
   pid_t parent = getpid();
   pid_t pid = fork();
   int i;
@@ -370,10 +371,12 @@ void createForeProcess(struct Command *cmd) {
 
   if(pid == -1) {
     // error
+    exit(1);
   } else if(pid > 0) {
     int status;
     waitpid(pid, &status, 0);
-    printf("done");
+    printf("done, status: %d", status);
+    return status;
   } else {
     // execvp(command, &argv[0]);
     _exit(0);
@@ -432,30 +435,53 @@ void createBackProcess(struct Command *cmd) {
 
 }
 
+// Built in command, stops all running processes with the same group id as calling process.
+void exitCommand() {
+  kill(0, SIGKILL);
+}
 
-int executeCommand(struct Command *cmd) {
+// Built in command, changes directory.
 
-  if(strcmp("exit", cmd->cmd) == 0 || strcmp("exit", cmd->cmd) == 0 || strcmp("exit", cmd->cmd) == 0) {
-    printf("Built in command!\n");
 
-  } else if(cmd->backgroundProcess) {            // Check the process type to create.
+// Built in command, prints the exit status or terminating signal of the last foreground process.
+void statusCommand(int status) {
+  printf("exit value: %d", status);                      // Print out the previous commands status value.
+}
+
+
+int executeCommand(struct Command *cmd, int prevCmdStatus) {
+  int foreStatus;
+
+  if(strcmp("exit", cmd->cmd) == 0) {             // Built in command exit.
+    exitCommand();
+
+  } else if(strcmp("cd", cmd->cmd) == 0) {            // Built in command cd.
+    //cdCommand();
+
+  } else if(strcmp("status", cmd->cmd) == 0) {        // Built in command status.
+    statusCommand(prevCmdStatus);                     // Pass status pointer to status command method.
+
+  } else if(cmd->backgroundProcess == 1) {            // Background process.
     createBackProcess(cmd);
 
-  } else {
-    createForeProcess(cmd);
+  } else {                                            // Foreground process.
+    foreStatus = createForeProcess(cmd);              // -1 means error
+    printf("Foreground: %d\b", foreStatus);
 
   }
+  return 1;
 
 }
 
 
 int main() {
-  int quitProg = 0;
+  int commandStatus = 0;
   struct Command *userCmd;
   int i = 0;
 
 
-  do{
+
+  do {
     userCmd = getCommand();             // Get the user's entered command.
 
     // Debuggin command struct and args.
@@ -475,10 +501,9 @@ int main() {
       continue;                         // Output file was bad, reprompt.
     }
 
-    executeCommand(userCmd);
 
-    // sleep(10);
-    quitProg = 1;
-  } while(quitProg != 1);
+    commandStatus = executeCommand(userCmd, commandStatus); // Returns 1 if users entered 'exit', 0 otherwise.
+
+  } while(strcmp("exit", userCmd->cmd) != 0);
 
 };

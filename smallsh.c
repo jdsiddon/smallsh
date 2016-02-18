@@ -5,6 +5,9 @@
 #include <errno.h>
 #include <signal.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #define MAX_ARGS 512
 #define MAX_CHARS 2048
@@ -210,13 +213,19 @@ struct Command* getCommand() {
           arg = strtok(NULL, " ");      // Get following string.
           // printf("Output: %s\n", arg);
           strcpy(cmd->outFilename, arg);
+          strcpy(cmd->args[cmd->argLen], arg);
+          cmd->argLen = cmd->argLen + 1;
           ioAssigned = 1;               // i/o assigned!
           continue;
 
         } else if(strcmp(arg, "<") == 0) {
           arg = strtok(NULL, " ");      // Get following string.
-          // printf("Input: %s\n", arg);           // Arguement is actually input file '< input'.
+          //printf("Input: %s\n", arg);           // Arguement is actually input file '< input'.
           strcpy(cmd->inFilename, arg);
+          // strcpy(cmd->args[cmd->argLen], " < ");
+          // cmd->argLen = cmd->argLen + 1;
+          strcpy(cmd->args[cmd->argLen], arg);
+          cmd->argLen = cmd->argLen + 1;
           ioAssigned = 1;               // i/o assigned!
           continue;
 
@@ -240,19 +249,19 @@ struct Command* getCommand() {
 
       }
 
-      //Debuggin command struct and args.
-      // printf("Command: %s\n", cmd->cmd);
-      // fflush(stdout);
-      // for(i = 0; i < cmd->argLen; i++) {
-      //   printf("Arg %d: %s\n", i, cmd->args[i]);
-      //   fflush(stdout);
-      // }
-      // printf("Input: %s\n", cmd->inFilename);
-      // fflush(stdout);
-      // printf("Output: %s\n", cmd->outFilename);
-      // fflush(stdout);
-      // printf("Bg: %d\n", cmd->backgroundProcess);
-      // fflush(stdout);
+      // Debuggin command struct and args.
+      printf("Command: %s\n", cmd->cmd);
+      fflush(stdout);
+      for(i = 0; i < cmd->argLen; i++) {
+        printf("Arg %d: %s\n", i, cmd->args[i]);
+        fflush(stdout);
+      }
+      printf("Input: %s\n", cmd->inFilename);
+      fflush(stdout);
+      printf("Output: %s\n", cmd->outFilename);
+      fflush(stdout);
+      printf("Bg: %d\n", cmd->backgroundProcess);
+      fflush(stdout);
 
       validInput = 1;
     }
@@ -339,6 +348,26 @@ int checkOutput(struct Command *cmd) {
 }
 
 
+// int redirect(struct Command *cmd) {
+//   FILE *input;
+//
+//   if(strlen(cmd->inFilename) > 0) {
+//     input = fopen(cmd->inFilename, "r");      // Open input file for reading.
+//     if(input < 0) {
+//       printf("Error!");
+//       fflush(stdout);
+//       return 1;
+//
+//     }
+//
+//     dup2(input, 1);                           // Redirect stdin to the 'input' file.
+//   } //|| (strlen(cmd->outFilename) > 0)) {       // User wants to redirect input/output.
+//
+//   return 1;
+// }
+
+
+
 // createForeProcess()
 // Creates a foreground process and executes it.
 // Algorithm
@@ -351,6 +380,9 @@ int createForeProcess(struct Command *cmd) {
   pid_t parent = getpid();        // Get parent pid.
   int i;
 
+  printf("Create for\n");
+  fflush(stdout);
+
   pid_t pid = fork();             // Fork process
 
   if(pid == -1) {
@@ -362,7 +394,20 @@ int createForeProcess(struct Command *cmd) {
     return status;
 
   } else {                          // CHILD PROCESS
+
+    printf("Shell, len: %d\n", cmd->argLen);
+    fflush(stdout);
+
     int newArgLen = cmd->argLen+2;              // Add two to arg array, 1 to hold command, 1 to hold 'NULL'.
+
+    // if(strlen(cmd->inFilename) > 0) {
+    //   newArgLen = newArgLen + 1;
+    // }
+    //
+    // if(strlen(cmd->outFilename) > 0) {
+    //   newArgLen = newArgLen + 1;
+    // }
+
     char* argv[newArgLen];                      // Adding 1 so the arg array can have the command as the first element.
 
     // Create an array to pass to the exec command.
@@ -370,9 +415,30 @@ int createForeProcess(struct Command *cmd) {
     int j = 1;
     for(i = 0; i < cmd->argLen; i++) {
       argv[j] = cmd->args[i];
+      printf("Argv: %s, args: %s\n", argv[j], cmd->args[i]);
+      fflush(stdout);
       j++;
     }
     argv[newArgLen-1] = NULL;               // Set last element to NULL as required by exec function family.
+
+    if((strlen(cmd->inFilename) > 0) || (strlen(cmd->outFilename) > 0)) {       // User wants to redirect input/output.
+      printf("Redirect!");
+      fflush(stdout);
+
+      if(strlen(cmd->outFilename) > 0) {
+      //////////////////////
+        int input;
+
+        if(strlen(cmd->inFilename) > 0) {
+          input = open(cmd->inFilename, O_RDONLY);      // Open input file for reading.
+          dup2(input, 1);                           // Redirect stdin to the 'input' file.
+        }
+
+      }
+      ////////////////
+
+      // redirect(cmd);
+    }
 
     execvp(argv[0], argv);                  // Execute the passed command.
     _exit(0);

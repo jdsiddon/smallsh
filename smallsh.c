@@ -207,11 +207,12 @@ struct Command* getCommand() {
       // Loop through each argument.
       while(arg != NULL) {
         // printf("Arg: %s\n", arg);
+        // fflush(stdout);
 
         // Check if arguements is actually input/output.
         if(strcmp(arg, ">") == 0) {     // Argument is actually output file '> output'.
           arg = strtok(NULL, " ");      // Get following string.
-          // printf("Output: %s\n", arg);
+
           strcpy(cmd->outFilename, arg);
           strcpy(cmd->args[cmd->argLen], arg);
           cmd->argLen = cmd->argLen + 1;
@@ -220,16 +221,16 @@ struct Command* getCommand() {
 
         } else if(strcmp(arg, "<") == 0) {
           arg = strtok(NULL, " ");      // Get following string.
-          //printf("Input: %s\n", arg);           // Arguement is actually input file '< input'.
+
           strcpy(cmd->inFilename, arg);
-          // strcpy(cmd->args[cmd->argLen], " < ");
-          // cmd->argLen = cmd->argLen + 1;
-          strcpy(cmd->args[cmd->argLen], arg);
-          cmd->argLen = cmd->argLen + 1;
+          printf("Arg: %s\n", arg);
+          fflush(stdout);
+          //strcpy(cmd->args[cmd->argLen], arg);
+          //cmd->argLen = cmd->argLen + 1;
           ioAssigned = 1;               // i/o assigned!
           continue;
 
-        } else if((ioAssigned == 0) && (strcmp(arg, "&") != 0)) { // Only get arguments if i/o isn't assigned, and != &.
+        } else if(strcmp(arg, "&") != 0) { // Only get arguments if i/o isn't assigned, and != &.
           strcpy(cmd->args[cmd->argLen], arg);      // Put arguement string in the command structure.
           cmd->argLen = cmd->argLen + 1;            // Increment number of arguments.
 
@@ -338,34 +339,14 @@ int checkOutput(struct Command *cmd) {
       }
       outputValid = 0;
 
-    } else {                                  // File open was successful.
-      fclose(output);                          // Close file.
+    } else {                                    // File open was successful.
+      fclose(output);                           // Close file.
 
     }
   }
 
   return outputValid;                          // Will return invalid if the file returned errors when trying to open file.
 }
-
-
-// int redirect(struct Command *cmd) {
-//   FILE *input;
-//
-//   if(strlen(cmd->inFilename) > 0) {
-//     input = fopen(cmd->inFilename, "r");      // Open input file for reading.
-//     if(input < 0) {
-//       printf("Error!");
-//       fflush(stdout);
-//       return 1;
-//
-//     }
-//
-//     dup2(input, 1);                           // Redirect stdin to the 'input' file.
-//   } //|| (strlen(cmd->outFilename) > 0)) {       // User wants to redirect input/output.
-//
-//   return 1;
-// }
-
 
 
 // createForeProcess()
@@ -395,49 +376,55 @@ int createForeProcess(struct Command *cmd) {
 
   } else {                          // CHILD PROCESS
 
-    printf("Shell, len: %d\n", cmd->argLen);
-    fflush(stdout);
+    // printf("Shell, len: %d\n", cmd->argLen);
+    // fflush(stdout);
 
-    int newArgLen = cmd->argLen+2;              // Add two to arg array, 1 to hold command, 1 to hold 'NULL'.
-
-    // if(strlen(cmd->inFilename) > 0) {
-    //   newArgLen = newArgLen + 1;
-    // }
-    //
-    // if(strlen(cmd->outFilename) > 0) {
-    //   newArgLen = newArgLen + 1;
-    // }
-
+    int newArgLen = cmd->argLen+1;              // Add two to arg array, 1 to hold command, 1 to hold 'NULL'.
     char* argv[newArgLen];                      // Adding 1 so the arg array can have the command as the first element.
 
     // Create an array to pass to the exec command.
     argv[0] = cmd->cmd;
     int j = 1;
+
+    printf("cmd->argLen: %d\n", cmd->argLen);
+
     for(i = 0; i < cmd->argLen; i++) {
       argv[j] = cmd->args[i];
-      printf("Argv: %s, args: %s\n", argv[j], cmd->args[i]);
-      fflush(stdout);
+
+      // printf("argv: %s, cmd->args: %s\n", argv[j], cmd->args[i]);
+      // fflush(stdout);
+
       j++;
     }
-    argv[newArgLen-1] = NULL;               // Set last element to NULL as required by exec function family.
+
+    argv[newArgLen] = NULL;               // Set last element to NULL as required by exec function family.
+
+
+    // printf("argvlen %d:\n", newArgLen);
+    // fflush(stdout);
+
+    // for(i = 0; i < newArgLen; i++) {
+    //   printf("Arg %d: %s\n", i, argv[i]);
+    //   fflush(stdout);
+    // }
+
 
     if((strlen(cmd->inFilename) > 0) || (strlen(cmd->outFilename) > 0)) {       // User wants to redirect input/output.
-      printf("Redirect!");
-      fflush(stdout);
-
-      if(strlen(cmd->outFilename) > 0) {
-      //////////////////////
-        int input;
-
-        if(strlen(cmd->inFilename) > 0) {
-          input = open(cmd->inFilename, O_RDONLY);      // Open input file for reading.
-          dup2(input, 1);                           // Redirect stdin to the 'input' file.
-        }
-
-      }
-      ////////////////
-
-      // redirect(cmd);
+      // if(strlen(cmd->inFilename) > 0) {                // Redirect input.
+      //   int input;
+      //
+      //   input = open(cmd->inFilename, O_RDONLY);      // Open input file for reading.
+      //   dup2(input, 1);                           // Redirect stdin to the 'input' file.
+      //
+      // }
+      //
+      // if(strlen(cmd->outFilename) > 0) {               // Redirect output.
+      //   int output;
+      //
+      //   output = open(cmd->outFilename, O_WRONLY | O_APPEND);      // Open input file for reading.
+      //   dup2(output, 1);                           // Redirect stdin to the 'input' file.
+      //
+      // }
     }
 
     execvp(argv[0], argv);                  // Execute the passed command.

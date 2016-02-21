@@ -34,6 +34,11 @@ struct Command* allocate() {
   return command;
 };
 
+void kill_handler(int signum) {
+  printf("terminated by signal %d\n", signum);
+  fflush(stdout);
+  return;
+}
 
 /**
 : will be used to prompt for each command line (make sure you flush with fflush())
@@ -162,6 +167,7 @@ else
  * - fflush() to clear output buffer
  */
  void promptUser(){
+   signal(SIGKILL, kill_handler);
    printf(": ");
    fflush(stdout);
  };
@@ -372,8 +378,6 @@ int createForeProcess(struct Command *cmd) {
     return status;
 
   } else {                          // CHILD PROCESS
-  //  printf("Front");
-  //  fflush(stdout);
     int newArgLen = cmd->argLen+1;              // Add two to arg array, 1 to hold command, 1 to hold 'NULL'.
     char* argv[newArgLen];                      // Adding 1 so the arg array can have the command as the first element.
 
@@ -435,7 +439,6 @@ int createBackProcess(struct Command *cmd) {
     fflush(stdout);
     waitpid(pid, &status, WNOHANG);       // Waits for child process.
     return status;
-    //return parent;
 
   } else {                          // CHILD PROCESS, pid = 0.
     int newArgLen = cmd->argLen+1;              // Add two to arg array, 1 to hold command, 1 to hold 'NULL'.
@@ -450,7 +453,7 @@ int createBackProcess(struct Command *cmd) {
       argv[j] = cmd->args[i];
       j++;
     }
-    argv[newArgLen] = NULL;                     // Set last element to NULL as required by exec function family.
+    argv[newArgLen] = NULL;                   // Set last element to NULL as required by exec function family.
 
     int output;                               // Where the processes output will go.
 
@@ -459,15 +462,13 @@ int createBackProcess(struct Command *cmd) {
     } else {                                                     // No file was provided so redirect to dev/null
       output = open("/dev/null", O_WRONLY);
     }
-    dup2(output, 1);                                           // Redirect stdout to the 'output' or dev/null.
+    dup2(output, 1);                                             // Redirect stdout to the 'output' or dev/null.
 
 
     int input;
-    // If stdin not defined set to /dev/null
-    input = open("/dev/null", O_RDONLY);
+    input = open("/dev/null", O_RDONLY);                         // If stdin not defined set to /dev/null
     dup2(input, 0);
 
-    sleep(5);
     execvp(argv[0], argv);                  // Execute the passed command.
     _exit(0);
 
@@ -501,18 +502,10 @@ void cdCommand(char *path) {
 }
 
 
-int executeCommand(struct Command *cmd, int prevCmdStatus) {
-  int foreStatus;
-  int backStatus;
 
+int executeCommand(struct Command *cmd, int prevCmdStatus, int* backStatus, int* foreStatus) {
 
-  pid_t childpid = waitpid(-1, &backStatus, WNOHANG);
-  if(childpid > 0) {                                 // Let use know background pid completed.
-    printf("background pid %d is done: exit value %d\n", childpid, backStatus);
-    fflush(stdout);
-  }
-
-  if(strcmp("exit", cmd->cmd) == 0) {             // Built in command exit.
+  if(strcmp("exit", cmd->cmd) == 0) {                 // Built in command exit.
     exitCommand();
 
   } else if(strcmp("cd", cmd->cmd) == 0) {            // Built in command cd.
@@ -522,41 +515,48 @@ int executeCommand(struct Command *cmd, int prevCmdStatus) {
     statusCommand(prevCmdStatus);                     // Pass status pointer to status command method.
 
   } else if(cmd->backgroundProcess == 1) {            // Background process.
-    backStatus = createBackProcess(cmd);
+    *backStatus = createBackProcess(cmd);
+    return *backStatus;                               // Return how the process executed.
 
   } else {                                            // Foreground process.
-    foreStatus = createForeProcess(cmd);              // -1 means error
+    *foreStatus = createForeProcess(cmd);             // -1 means error
+    return *foreStatus;                               // Return how the process executed.
 
   }
   return 1;
-
 }
 
 
-void sighandler(int signum) {
-  printf("Caught err: %d\n", signum);
-  fflush(stdout);
 
-}
 
 int main() {
   int commandStatus = 0;
   struct Command *userCmd;
   int i = 0;
+  int foreStatus;
+  int backStatus;
 
+  signal(SIGINT, kill_handler);
 
   do {
-    userCmd = getCommand();             // Get the user's entered command.
+
+    pid_t childpid = waitpid(-1, &backStatus, WNOHANG);
+    if(childpid > 0) {                     // Let use know background pid completed.
+      printf("background pid %d is done: %s %d\n", childpid, backStatus == 0 ?"exit value" : "terminated by signal", backStatus);
+      fflush(stdout);
+    }
+
+    userCmd = getCommand();               // Get the user's entered command.
 
     if(checkInput(userCmd) == 0) {
-      continue;                         // Input file was bad, reprompt.
+      continue;                           // Input file was bad, reprompt.
     }
 
     if(checkOutput(userCmd) == 0) {
-      continue;                         // Output file was bad, reprompt.
+      continue;                           // Output file was bad, reprompt.
     }
 
-    commandStatus = executeCommand(userCmd, commandStatus); // Returns 1 if users entered 'exit', 0 otherwise.
+    commandStatus = executeCommand(userCmd, commandStatus, &backStatus, &foreStatus); // Returns 1 if users entered 'exit', 0 otherwise.
 
   } while(strcmp("exit", userCmd->cmd) != 0);
 

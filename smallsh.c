@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 
 #define MAX_ARGS 512
@@ -264,6 +265,8 @@ struct Command* getCommand() {
 };
 
 
+
+
 //
 // checkInput()
 // Checks that input file has 'read' only flag set.
@@ -303,6 +306,8 @@ int checkInput(struct Command *cmd) {
 }
 
 
+
+
 // checkOutput()
 // Checks that output file has 'write' only flag set.
 // Algorithm
@@ -340,6 +345,11 @@ int checkOutput(struct Command *cmd) {
 }
 
 
+
+
+
+
+
 // createForeProcess()
 // Creates a foreground process and executes it.
 // Algorithm
@@ -349,16 +359,12 @@ int checkOutput(struct Command *cmd) {
 // - Execute process
 // - Process completes return to get command line statement
 int createForeProcess(struct Command *cmd) {
-  pid_t parent = getpid();        // Get parent pid.
+  pid_t parent = getpid();          // Get parent pid.
   int i;
-
-  // printf("Create for\n");
-  // fflush(stdout);
-
-  pid_t pid = fork();             // Fork process
+  pid_t pid = fork();               // Fork process
 
   if(pid == -1) {
-    exit(1);            // error
+    exit(1);                        // error
 
   } else if(pid > 0) {              // PARENT PROCESS
     int status;
@@ -366,6 +372,8 @@ int createForeProcess(struct Command *cmd) {
     return status;
 
   } else {                          // CHILD PROCESS
+  //  printf("Front");
+  //  fflush(stdout);
     int newArgLen = cmd->argLen+1;              // Add two to arg array, 1 to hold command, 1 to hold 'NULL'.
     char* argv[newArgLen];                      // Adding 1 so the arg array can have the command as the first element.
 
@@ -381,14 +389,6 @@ int createForeProcess(struct Command *cmd) {
     argv[newArgLen] = NULL;                     // Set last element to NULL as required by exec function family.
 
     if((strlen(cmd->inFilename) > 0) || (strlen(cmd->outFilename) > 0)) {       // User wants to redirect input/output.
-      // if(strlen(cmd->inFilename) > 0) {                // Redirect input.
-      //   int input;
-      //
-      //   input = open(cmd->inFilename, O_RDONLY);      // Open input file for reading.
-      //   dup2(input, 1);                           // Redirect stdin to the 'input' file.
-      //
-      // }
-
       if(strlen(cmd->outFilename) > 0) {               // Redirect output.
         int output;
 
@@ -405,6 +405,11 @@ int createForeProcess(struct Command *cmd) {
 }
 
 
+
+
+
+
+
 // createBackProcess()
 // Creates a background process and executes it.
 // Algorithm
@@ -415,8 +420,58 @@ int createForeProcess(struct Command *cmd) {
 // - execute process
 // - Print background process pid "background pid is XXXX"
 // - Return command line control immediately
-void createBackProcess(struct Command *cmd) {
+int createBackProcess(struct Command *cmd) {
+  pid_t parent = getpid();          // Get parent pid.
+  int i;
+  pid_t pid = fork();               // Fork process
 
+  if(pid == -1) {
+    exit(1);                        // error
+
+  } else if(pid > 0) {              // PARENT PROCESS
+    int status;
+    // Print out background PID info.
+    printf("background pid is %d\n", pid);      // Since we are in the parent process, 'pid' is assigned the value of the childs pid.
+    fflush(stdout);
+    waitpid(pid, &status, WNOHANG);       // Waits for child process.
+    return status;
+    //return parent;
+
+  } else {                          // CHILD PROCESS, pid = 0.
+    int newArgLen = cmd->argLen+1;              // Add two to arg array, 1 to hold command, 1 to hold 'NULL'.
+    char* argv[newArgLen];                      // Adding 1 so the arg array can have the command as the first element.
+
+    // Create an array to pass to the exec command.
+    argv[0] = cmd->cmd;                         // Set first array element to command line command.
+    int j = 1;                                  // Set place of first command line arguement.
+
+    // Put each command in the command line arguement array.
+    for(i = 0; i < cmd->argLen; i++) {
+      argv[j] = cmd->args[i];
+      j++;
+    }
+    argv[newArgLen] = NULL;                     // Set last element to NULL as required by exec function family.
+
+    int output;                               // Where the processes output will go.
+
+    if(strlen(cmd->outFilename) > 0) {                           // Redirect output to the specified file, if one was provided.
+      output = open(cmd->outFilename, O_WRONLY | O_APPEND);      // Open input file for reading.
+    } else {                                                     // No file was provided so redirect to dev/null
+      output = open("/dev/null", O_WRONLY);
+    }
+    dup2(output, 1);                                           // Redirect stdout to the 'output' or dev/null.
+
+
+    int input;
+    // If stdin not defined set to /dev/null
+    input = open("/dev/null", O_RDONLY);
+    dup2(input, 0);
+
+    sleep(5);
+    execvp(argv[0], argv);                  // Execute the passed command.
+    _exit(0);
+
+  }
 }
 
 // Built in command, stops all running processes with the same group id as calling process.
@@ -438,18 +493,24 @@ void statusCommand(int status) {
 // directory: when smallsh exits, the pwd will be the original pwd when smallsh was
 // launched. Your cd command should support both absolute and relative paths.
 void cdCommand(char *path) {
-  printf("Path: %s", path);
-  fflush(stdout);
-
   if((int)strlen(path) > 0) {       // If user specified a path.
     chdir(path);
+  } else {
+    chdir(getenv("HOME"));          // User didn't specify path so go to where the home env variable points.
   }
-
 }
 
 
 int executeCommand(struct Command *cmd, int prevCmdStatus) {
   int foreStatus;
+  int backStatus;
+
+
+  pid_t childpid = waitpid(-1, &backStatus, WNOHANG);
+  if(childpid > 0) {                                 // Let use know background pid completed.
+    printf("background pid %d is done: exit value %d\n", childpid, backStatus);
+    fflush(stdout);
+  }
 
   if(strcmp("exit", cmd->cmd) == 0) {             // Built in command exit.
     exitCommand();
@@ -461,12 +522,10 @@ int executeCommand(struct Command *cmd, int prevCmdStatus) {
     statusCommand(prevCmdStatus);                     // Pass status pointer to status command method.
 
   } else if(cmd->backgroundProcess == 1) {            // Background process.
-    createBackProcess(cmd);
+    backStatus = createBackProcess(cmd);
 
   } else {                                            // Foreground process.
     foreStatus = createForeProcess(cmd);              // -1 means error
-    //printf("Foreground: %d\b", foreStatus);
-    //fflush(stdout);
 
   }
   return 1;
@@ -474,24 +533,20 @@ int executeCommand(struct Command *cmd, int prevCmdStatus) {
 }
 
 
+void sighandler(int signum) {
+  printf("Caught err: %d\n", signum);
+  fflush(stdout);
+
+}
+
 int main() {
   int commandStatus = 0;
   struct Command *userCmd;
   int i = 0;
 
 
-
   do {
     userCmd = getCommand();             // Get the user's entered command.
-
-    // Debuggin command struct and args.
-    // printf("Command: %s\n", userCmd->cmd);
-    // for(i = 0; i < userCmd->argLen; i++) {
-    //   printf("Arg %d: %s\n", i, userCmd->args[i]);
-    // }
-    // printf("Input: %s\n", userCmd->inFilename);
-    // printf("Output: %s\n", userCmd->outFilename);
-    // printf("Bg: %d\n", userCmd->backgroundProcess);
 
     if(checkInput(userCmd) == 0) {
       continue;                         // Input file was bad, reprompt.
@@ -500,7 +555,6 @@ int main() {
     if(checkOutput(userCmd) == 0) {
       continue;                         // Output file was bad, reprompt.
     }
-
 
     commandStatus = executeCommand(userCmd, commandStatus); // Returns 1 if users entered 'exit', 0 otherwise.
 

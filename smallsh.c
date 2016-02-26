@@ -113,8 +113,11 @@ int executeCommand(struct Command *cmd, int prevCmdStatus, int* backStatus, int*
 
   } else if(cmd->backgroundProcess == 0){                                            // Foreground process.
     *foreStatus = createForeProcess(cmd);             // -1 means error
-    // printf("for: %i", *foreStatus);
+    // printf("for: %d", *foreStatus);
     // fflush(stdout);
+    // if (foreStatus == ENOENT) {
+    //
+    // }
     return *foreStatus;                               // Return how the process executed.
 
   }

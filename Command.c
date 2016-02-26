@@ -216,7 +216,6 @@ int createForeProcess(struct Command *cmd) {
     if( WIFEXITED(status) == 1) {
       int val = WEXITSTATUS(status);
       if(val > 0) {
-        printf("Status: %d", val);
         return 1;
       }
       return 0;

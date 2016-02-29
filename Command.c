@@ -67,6 +67,9 @@ struct Command* getCommand(int *backStatus) {
    } else if(cmdSize == 0) {           // User pressed enter.
      validInput = 0;
 
+   } else if(buffer[0] == 35) {       // User entered a comment line.
+     validInput = 0;                   // Comments are valid input, but they aren't a valid command so set flag to false.
+
    } else {
      arg = strtok(buffer, " ");        // Get command, (1st argument user enters.)
      strcpy(cmd->cmd, arg);
